@@ -1,4 +1,5 @@
 # Vibhu's Map of Global Health
+https://vibhuguru.github.io/ideabank/vibhus-map/
 
 A goofy world map of public health news, history and medical art. Let's learn!
 
