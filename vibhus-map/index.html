@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="A goofy world map of public health news, history and medical art. Let's learn!">
-<script>window.VM_CONFIG = { supabaseUrl: "https://lzivmlmsuwnfcmwkbyuf.supabase.co", supabaseKey: "sb_publishable_UTsACfU3ivZD9RxGnjbFGg_jUhHQtth" };</script>
+<script>window.VM_CONFIG = { supabaseUrl: "https://lzivmlmsuwnfcmwkbyuf.supabase.co", liveUrl: "https://raw.githubusercontent.com/vibhuguru/ideabank/live-data/live.json", supabaseKey: "sb_publishable_UTsACfU3ivZD9RxGnjbFGg_jUhHQtth" };</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>body{margin:0}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}</style>
 </head>
@@ -191,6 +191,11 @@ a{color:inherit}
 .card-body{padding:16px 18px 16px;display:flex;flex-direction:column;gap:10px}
 .card-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding-right:36px}
 .tag{font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:999px;background:var(--chip);color:var(--muted)}
+.livedot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#2ec27e;margin-right:5px;vertical-align:1px;box-shadow:0 0 0 2px color-mix(in srgb,#2ec27e 25%,transparent)}
+.live-tag{display:inline-flex;align-items:center}
+.live-toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);opacity:0;pointer-events:none;z-index:60;background:var(--panel,#fff);color:var(--ink,#222);font:700 13.5px/1.2 Nunito,system-ui,sans-serif;padding:10px 16px;border-radius:999px;box-shadow:0 8px 24px rgba(0,0,0,.18);transition:opacity .25s,transform .25s}
+.live-toast.on{opacity:1;transform:translate(-50%,0)}
+@media (prefers-reduced-motion:reduce){.live-toast{transition:none}}
 .tag.cat-tag{background:var(--c);color:#1a1a2e;border:2px solid var(--outline)}
 .country{display:flex;align-items:center;gap:10px}
 .country img{width:42px;height:28px;border-radius:5px;border:2px solid var(--outline);object-fit:cover;flex:none}
@@ -532,6 +537,39 @@ const state = {
 };
 const hearts = { db:null, uid:null, canWrite:false, counts:{}, mine:new Set(), busy:false };
 let STORIES = [], EVENTS = [], ART = [], FLAGS = {}, updated = null;
+/* Live news: a robot on GitHub reads health news feeds every 15 minutes and writes live.json. */
+const LIVE_URL = (window.VM_CONFIG || {}).liveUrl || "";
+let CURATED = [], LIVE = [], curatedUpdated = null, liveUpdated = null, liveCheckedAt = 0, liveSeen = null;
+function mergeStories(){
+  const urls = new Set(CURATED.map(x => x.url));
+  STORIES = [...CURATED, ...LIVE.filter(x => !urls.has(x.url))].map(x => ({...x, age: ageDays(x.date)}));
+  updated = [curatedUpdated, liveUpdated && liveUpdated.slice(0, 10)].filter(Boolean).sort().pop() || null;
+}
+async function loadLive(){
+  liveCheckedAt = Date.now();
+  try {
+    const r = await fetch(LIVE_URL + (LIVE_URL.includes("?") ? "&" : "?") + "t=" + Math.floor(Date.now() / 60e3), { cache: "no-store" });
+    if (!r.ok) return;
+    const d = await r.json(); if (!d || !Array.isArray(d.stories)) return;
+    const ids = new Set(d.stories.map(x => x.id));
+    const fresh = liveSeen ? d.stories.filter(x => !liveSeen.has(x.id)) : [];
+    liveSeen = ids; LIVE = d.stories; liveUpdated = d.updated || null;
+    mergeStories();
+    if (state.selectedGroup && !STORIES.some(x => x.id === state.selectedId)) closeCard();
+    refresh(); if (state.selectedGroup) renderCard();
+    if (fresh.length) liveToast(fresh.length);
+  } catch(e){}
+}
+function liveToast(n){
+  let t = document.getElementById("liveToast");
+  if (!t){ t = document.createElement("div"); t.id = "liveToast"; t.className = "live-toast"; t.setAttribute("role", "status"); document.body.appendChild(t); }
+  t.innerHTML = `<span class="livedot"></span>${n} new ${n === 1 ? "story" : "stories"} just landed`;
+  t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("on"), 5000);
+}
+function liveAgo(isoStr){
+  const m = Math.max(0, Math.round((Date.now() - new Date(isoStr)) / 60e3));
+  return m < 1 ? "just now" : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`;
+}
 
 /* ---------- helpers ---------- */
 const $ = s => document.querySelector(s);
@@ -930,7 +968,7 @@ function renderFeed(items){
   if (state.world === "art") $("#summary").innerHTML = `<strong>${n}</strong> ${n===1?"artwork":"artworks"} · ${n ? fmtYear(items[0].year) + " to " + fmtYear(items[n-1].year) : ""}`;
   else if (state.mode === "now"){
     const rl = RECENCY.find(r => r.d === state.recency).l;
-    $("#summary").innerHTML = `<strong>${n}</strong> ${n===1?"story":"stories"} · ${state.recency === Infinity ? "all time" : "last " + rl}` + (updated ? ` · updated ${fmtDate(updated)}` : "");
+    $("#summary").innerHTML = `<strong>${n}</strong> ${n===1?"story":"stories"} · ${state.recency === Infinity ? "all time" : "last " + rl}` + (liveUpdated ? ` · <span class="livedot"></span>live, checked ${liveAgo(liveUpdated)}` : updated ? ` · updated ${fmtDate(updated)}` : "");
   } else $("#summary").innerHTML = `<strong>${n}</strong> ${n===1?"moment":"moments"} up to ${fmtYear(posToYear(state.yearPos))}`;
   if (!n){
     $("#feed").innerHTML = `<li class="empty">${state.world === "news" && state.mode === "history" ? "Nothing on the map yet. Drag the timeline forward." : "Nothing matches. Try a longer time range or switch a category back on in the Key."}</li>`;
@@ -971,7 +1009,7 @@ function renderCard(){
   const s = g.items.find(i => i.id === state.selectedId) || g.items[0];
   const isArt = state.world === "art", isNow = !isArt && state.mode === "now";
   const when = isArt ? `${s.artist} · ${s.when}` : isNow ? `${fmtDate(s.date)} · ${ago(s.age)}` : fmtYear(s.year);
-  const region = isNow && s.region ? `<span class="tag">${esc(REGION_LABEL[s.region] || s.region)}</span>` : "";
+  const region = (isNow && s.region ? `<span class="tag">${esc(REGION_LABEL[s.region] || s.region)}</span>` : "") + (isNow && s.live ? `<span class="tag live-tag" title="Picked up automatically from ${esc(s.source)}'s news feed"><span class="livedot"></span>Live feed</span>` : "");
   const others = g.items.filter(i => i.id !== s.id);
   card.style.setProperty("--c", `var(--c-${s.category})`);
   card.innerHTML = `<button class="close" id="cardClose" aria-label="Close">${X_ICON}</button>
@@ -1295,7 +1333,7 @@ async function boot(){
   buildControls(); renderKey(); resize(); setDrag("move"); $("#dragmode").hidden = state.view === "globe";
   try {
     const [s, h, a] = await Promise.all(["stories","history","art"].map(n => fetch(`data/${n}.json`).then(r => r.json())));
-    STORIES = s.stories.map(x => ({...x, age: ageDays(x.date)})); updated = s.updated; EVENTS = h.events; ART = a.items;
+    CURATED = s.stories; curatedUpdated = s.updated; mergeStories(); EVENTS = h.events; ART = a.items;
     artCount = {}; ART.forEach(x => artCount[x.cc] = (artCount[x.cc] || 0) + 1); artMax = Math.max(1, ...Object.values(artCount));
     $("#sampleBadge").hidden = !(s.sample || h.sample || a.sample);
     $("#loading").remove();
@@ -1303,6 +1341,12 @@ async function boot(){
   buildDock(); refresh(); resize();
   fetch("data/flags.json").then(r => r.json()).then(f => { FLAGS = f; refresh(); if (state.selectedGroup) renderCard(); renderAotd(); }).catch(() => {});
   initHearts().catch(() => {});
+  if (LIVE_URL){
+    loadLive();
+    setInterval(loadLive, 5 * 60e3);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - liveCheckedAt > 60e3) loadLive(); });
+    setInterval(() => { if (liveUpdated && state.world === "news" && state.mode === "now") refresh(); }, 60e3);
+  }
 }
 boot();
 </script>
