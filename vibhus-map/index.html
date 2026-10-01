@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="A goofy world map of public health news, history and medical art. Let's learn!">
-<script>window.VM_CONFIG = { supabaseUrl: "https://lzivmlmsuwnfcmwkbyuf.supabase.co", supabaseKey: "sb_publishable_UTsACfU3ivZD9RxGnjbFGg_jUhHQtth" /* paste the anon public / publishable key here */ };</script>
+<script>window.VM_CONFIG = { supabaseUrl: "https://lzivmlmsuwnfcmwkbyuf.supabase.co", supabaseKey: "sb_publishable_UTsACfU3ivZD9RxGnjbFGg_jUhHQtth" };</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>body{margin:0}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}</style>
 </head>
@@ -315,7 +315,21 @@ body.show-looks .panel{top:170px}
 .front img{width:100%;height:100%;object-fit:cover;display:block}
 .front .art-ph{padding:10px}
 .front .art-ph span{font-size:11px}
-.front::after{content:"";position:absolute;left:0;right:0;bottom:0;height:5px;background:var(--hc,var(--heat-lo))}
+.front .gen{width:100%;height:100%;display:block}
+.front .ttl{position:absolute;left:0;right:0;bottom:0;padding:28px 10px 9px;background:linear-gradient(to top,rgba(10,7,21,.92) 0%,rgba(10,7,21,.7) 55%,rgba(10,7,21,0) 100%);color:#fff;font-family:var(--f-read-head);font-weight:700;font-size:13.5px;line-height:1.25;text-align:left;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.wall .feature .front .ttl{font-size:16px;padding:40px 14px 12px}
+.back .credit{font-size:10.5px;color:var(--muted)}
+:root[data-world="art"] .key,:root[data-world="art"] #keyBtn{display:none!important}
+.sources{position:absolute;right:16px;top:70px;width:min(420px,calc(100% - 32px));max-height:calc(100% - 86px);overflow-y:auto;z-index:8;padding:16px 16px 10px}
+.src-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.src-head h2{margin:0;font-family:var(--f-read-head);font-size:21px}
+.src-head .close{position:static}
+.src-intro{margin:6px 0 10px;font-size:13.5px;color:var(--muted);font-family:var(--f-read)}
+.src-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;font-family:var(--f-read)}
+.src-list a{display:flex;flex-direction:column;gap:2px;padding:9px 10px;border-radius:10px;text-decoration:none;color:var(--ink)}
+.src-list a:hover{background:var(--chip)}
+.src-list b{font-size:14.5px;color:var(--heat-lo)}
+.src-list span{font-size:12.5px;color:var(--muted)}
 .back{transform:rotateY(180deg);background:var(--panel);padding:12px;display:flex;flex-direction:column;gap:5px;font-family:var(--f-read)}
 .back b{font-family:var(--f-read-head);font-size:15px;line-height:1.2}
 .back .who{font-size:12.5px;font-weight:600}
@@ -396,6 +410,7 @@ body.show-looks .panel{top:170px}
       <button class="btn" id="artToggle" aria-pressed="false">
         <span id="artIcon"></span><span id="artLabel">Medical art</span>
       </button>
+      <button class="btn" id="srcBtn" hidden aria-pressed="false" aria-expanded="false" aria-controls="sources"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z"/><path d="M8 7h7M8 11h7"/></svg>Sources</button>
       <button class="btn" id="keyBtn" aria-pressed="false" aria-controls="key">Key</button>
       <button class="btn" id="panelToggle" aria-expanded="true" aria-pressed="true" aria-controls="panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span id="panelLabel">Stories</span></button>
     </div>
@@ -457,6 +472,7 @@ body.show-looks .panel{top:170px}
 
   <article class="card box" id="card" hidden aria-live="polite"></article>
   <aside class="gallery box" id="gallery" hidden aria-label="Country gallery"></aside>
+  <section class="sources box" id="sources" hidden aria-label="Art archives"></section>
   <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="rainbow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FF4D6D"/><stop offset=".2" stop-color="#FF9F1C"/><stop offset=".4" stop-color="#FFE14D"/><stop offset=".6" stop-color="#3DDC84"/><stop offset=".8" stop-color="#3D8BFF"/><stop offset="1" stop-color="#9B5DE5"/></linearGradient></defs></svg>
   <div class="looks box" id="looks" aria-label="Day looks"><div class="looks-row"><span class="label" id="looksLabel">Map colors</span><span id="looksBtns" style="display:flex;gap:6px"></span></div></div>
 
@@ -570,7 +586,7 @@ function readColors(){
   }
   needsDraw = true;
 }
-const scheme = () => state.world === "art" ? state.artPal : state.theme === "night" ? "night" : "tropical";
+const scheme = () => state.world === "art" ? "bloom" : state.theme === "night" ? "night" : "tropical";
 const rot = () => state.view === "globe" ? rotG : rotF;
 
 function mapArea(){
@@ -1052,12 +1068,38 @@ addEventListener("keydown", e => { if (e.key !== "Escape") return; if (state.cou
 
 /* ---------- art wall ---------- */
 const FRAME = `<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="8" width="36" height="32" rx="2"/><rect x="11" y="13" width="26" height="22"/><path d="M11 31l8-8 6 6 4-4 8 8"/><circle cx="30" cy="19" r="2.5"/></svg>`;
-function artImg(a){ return a.image ? `<img src="${esc(a.image)}" alt="${esc(a.title)}" loading="lazy" data-fb="art">` : `<div class="art-ph">${FRAME}<span>Image coming soon</span></div>`; }
+/* Generated art for cards without a photo: a seeded, static composition of pills, cells, crosses and stripes. */
+const GEN_COLORS = ["#FF7EB6", "#C9A2FF", "#4FE3A0", "#FFE45E", "#6FE3FF", "#FFA36B"];
+function seeded(str){ let h = 2166136261; for (const ch of str){ h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 10000) / 10000; }; }
+function genArt(a){
+  const r = seeded(a.id), pick = arr => arr[Math.floor(r() * arr.length)], C = () => pick(GEN_COLORS);
+  const bg = pick(["#1C1731", "#231B3D", "#17213A", "#2A1A33"]);
+  let s = `<rect width="300" height="400" fill="${bg}"/>`;
+  for (let i = 0; i < 40; i++) s += `<circle cx="${(r()*300).toFixed(0)}" cy="${(r()*400).toFixed(0)}" r="${(r()*1.6+0.4).toFixed(1)}" fill="#fff" opacity="${(r()*0.4+0.15).toFixed(2)}"/>`;
+  const big = C();
+  s += `<circle cx="${(60 + r()*180).toFixed(0)}" cy="${(80 + r()*140).toFixed(0)}" r="${(70 + r()*50).toFixed(0)}" fill="${big}" opacity=".9"/>`;
+  const motif = a.category;
+  const n = 5 + Math.floor(r() * 5);
+  for (let i = 0; i < n; i++){
+    const x = (r()*260 + 20).toFixed(0), y = (r()*320 + 30).toFixed(0), col = C(), rot = (r()*180).toFixed(0);
+    const kind = motif === "manuscript" ? pick(["lines","lines","pill","dot"]) : motif === "anatomy" ? pick(["cell","cell","ring","cross"]) : motif === "sculpture" ? pick(["stack","ring","dot"]) : motif === "poster" ? pick(["cross","star","pill"]) : pick(["pill","ring","cell","cross","dot"]);
+    if (kind === "pill") s += `<g transform="translate(${x} ${y}) rotate(${rot})"><rect x="-34" y="-13" width="68" height="26" rx="13" fill="${col}" stroke="#0A0715" stroke-width="3"/><path d="M0 -13 V13" stroke="#0A0715" stroke-width="3"/><rect x="0" y="-13" width="34" height="26" rx="13" fill="#fff" opacity=".85"/></g>`;
+    else if (kind === "ring") s += `<circle cx="${x}" cy="${y}" r="${(18 + r()*26).toFixed(0)}" fill="none" stroke="${col}" stroke-width="${(4 + r()*6).toFixed(0)}"/>`;
+    else if (kind === "cell") { const rr = 16 + r()*22; s += `<g transform="translate(${x} ${y})"><ellipse rx="${rr.toFixed(0)}" ry="${(rr*0.75).toFixed(0)}" fill="${col}" opacity=".85" stroke="#0A0715" stroke-width="3"/><circle r="${(rr*0.3).toFixed(0)}" fill="#0A0715" opacity=".55"/></g>`; }
+    else if (kind === "cross") s += `<g transform="translate(${x} ${y}) rotate(${(r()*30-15).toFixed(0)})"><rect x="-8" y="-24" width="16" height="48" rx="4" fill="${col}"/><rect x="-24" y="-8" width="48" height="16" rx="4" fill="${col}"/></g>`;
+    else if (kind === "star") s += `<path transform="translate(${x} ${y}) scale(${(0.6 + r()*0.8).toFixed(2)})" d="M0-22 L6-6 L22 0 L6 6 L0 22 L-6 6 L-22 0 L-6-6Z" fill="${col}"/>`;
+    else if (kind === "lines") { let l = ""; for (let k = 0; k < 4; k++) l += `<rect x="0" y="${k*12}" width="${(60 + r()*60).toFixed(0)}" height="5" rx="2.5" fill="${col}" opacity="${(0.5 + r()*0.5).toFixed(2)}"/>`; s += `<g transform="translate(${Math.min(+x, 160)} ${y})">${l}</g>`; }
+    else if (kind === "stack") s += `<g transform="translate(${x} ${y})"><rect x="-26" y="10" width="52" height="16" rx="4" fill="${col}"/><rect x="-18" y="-6" width="36" height="16" rx="4" fill="${C()}"/><circle cy="-18" r="12" fill="${C()}"/></g>`;
+    else s += `<circle cx="${x}" cy="${y}" r="${(6 + r()*12).toFixed(0)}" fill="${col}"/>`;
+  }
+  return `<svg class="gen" viewBox="0 0 300 400" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${s}</svg>`;
+}
+function artImg(a){ return a.image ? `<img src="${esc(a.image)}" alt="${esc(a.title)}" loading="lazy" data-fb="art" data-gid="${esc(a.id)}">` : genArt(a); }
 function flipCard(a){
-  return `<button class="flip" aria-label="${esc(a.title)}, flip for details" style="--hc:${heatColor(artCount[a.cc])}"><span class="flip-in">
-    <span class="face front">${artImg(a)}</span>
+  return `<button class="flip" aria-label="${esc(a.title)}, flip for details"><span class="flip-in">
+    <span class="face front">${artImg(a)}<span class="ttl">${esc(a.title)}</span></span>
     <span class="face back"><b>${esc(a.title)}</b><span class="who">${esc(a.artist)}</span><span class="when">${esc(a.when)} · ${flagImg(a.cc)} ${esc(a.country)}</span>
-      <span class="cat">${CAT_LABEL[a.category]}</span><a href="${esc(a.url)}" target="_blank" rel="noopener">View at ${esc(a.source)} ↗</a></span>
+      <span class="cat">${CAT_LABEL[a.category]}</span><a href="${esc(a.url)}" target="_blank" rel="noopener">View at ${esc(a.source)} ↗</a>${a.image && a.credit ? `<small class="credit">${esc(a.credit)}</small>` : ""}</span>
   </span></button>`;
 }
 function openCountry(cc){
@@ -1079,7 +1121,8 @@ function renderWall(){
   let feature = "";
   if (!state.country && state.galleryCat === "all"){
     const d = new Date(), key = d.getFullYear() * 1000 + Math.floor((d - new Date(d.getFullYear(), 0, 0)) / DAY);
-    const a = ART[(key * 2654435761 >>> 0) % ART.length];
+    const pool = ART.filter(x => x.image).length ? ART.filter(x => x.image) : ART;
+    const a = pool[(key * 2654435761 >>> 0) % pool.length];
     feature = `<li class="feature"><span class="label">Art of the day <small>${d.toLocaleDateString(undefined,{weekday:"long", day:"numeric", month:"short"})}</small></span>${flipCard(a)}</li>`;
   }
   feed.innerHTML = shown.length ? feature + shown.map(a => `<li>${flipCard(a)}</li>`).join("") : `<li class="empty" style="grid-column:1/-1">No medical art from ${esc(cname || "here")} on the map yet.</li>`;
@@ -1118,9 +1161,34 @@ document.addEventListener("error", e => {
   const img = e.target;
   if (!(img instanceof HTMLImageElement) || !img.dataset.fb) return;
   const ph = document.createElement("div");
-  ph.innerHTML = img.dataset.fb === "thumb" ? `<b aria-hidden="true">${esc(img.dataset.letter || "?")}</b>` : `<div class="art-ph">${FRAME}<span>Image coming soon</span></div>`;
+  const item = img.dataset.gid && ART.find(x => x.id === img.dataset.gid);
+  ph.innerHTML = img.dataset.fb === "thumb" ? `<b aria-hidden="true">${esc(img.dataset.letter || "?")}</b>` : item ? genArt(item) : `<div class="art-ph">${FRAME}<span>Image coming soon</span></div>`;
   img.replaceWith(...ph.childNodes);
 }, true);
+
+/* ---------- sources: archives to explore ---------- */
+const SOURCES = [
+  ["Wellcome Collection", "London", "https://wellcomecollection.org/collections", "Where most of this gallery comes from: thousands of free medical images."],
+  ["US National Library of Medicine", "Bethesda", "https://collections.nlm.nih.gov/", "Public health posters, prints and historic books."],
+  ["Wikimedia Commons: medicine in art", "Online", "https://commons.wikimedia.org/wiki/Category:Medicine_in_art", "Free-to-use paintings and prints about medicine."],
+  ["The Met Open Access", "New York", "https://www.metmuseum.org/art/collection/search", "Search \"medicine\" or \"healing\" across 5,000 years of art."],
+  ["Rijksmuseum", "Amsterdam", "https://www.rijksmuseum.nl/en/collection", "Dutch anatomy lessons, apothecaries and quacks."],
+  ["Smithsonian Open Access", "Washington, DC", "https://www.si.edu/openaccess", "Millions of free images, including medical objects."],
+  ["Science Museum Group", "London", "https://collection.sciencemuseumgroup.org.uk/", "Medical instruments, models and objects."],
+  ["Library of Congress: WPA posters", "Washington, DC", "https://www.loc.gov/collections/works-progress-administration-posters/", "1930s public health posters."],
+  ["BIU Santé (Medica)", "Paris", "https://www.biusante.parisdescartes.fr/histoire/medica/", "Digitised French medical books and images."],
+  ["Medical Heritage Library", "Internet Archive", "https://archive.org/details/medicalheritagelibrary", "Free historic medical books to read online."],
+  ["Europeana", "Europe", "https://www.europeana.eu/", "Art and archives from museums across Europe."],
+  ["National Diet Library Digital Collections", "Tokyo", "https://dl.ndl.go.jp/en/", "Japanese medical woodblock books and prints."],
+  ["Biodiversity Heritage Library", "Online", "https://www.biodiversitylibrary.org/", "Herbals and botanical books on medicinal plants."],
+  ["Mütter Museum", "Philadelphia", "https://muttermuseum.org/", "A museum of medical history and oddities."]
+];
+function setSources(open){ $("#sources").hidden = !open; $("#srcBtn").setAttribute("aria-pressed", open); $("#srcBtn").setAttribute("aria-expanded", open); }
+$("#sources").innerHTML = `<div class="src-head"><h2>Explore the archives</h2><button class="close" id="srcClose" aria-label="Close sources">${X_ICON}</button></div>
+  <p class="src-intro">Want to dig deeper? These collections let you browse medical art for free.</p>
+  <ul class="src-list">${SOURCES.map(([n, where, u, d]) => `<li><a href="${u}" target="_blank" rel="noopener"><b>${esc(n)} ↗</b><span>${esc(where)} · ${esc(d)}</span></a></li>`).join("")}</ul>`;
+$("#srcBtn").onclick = () => setSources($("#sources").hidden);
+$("#sources").addEventListener("click", e => { if (e.target.closest("#srcClose")) setSources(false); });
 
 /* ---------- top-level controls ---------- */
 function setView(v){
@@ -1158,7 +1226,8 @@ function applyScheme(){
   $("#artLabel").textContent = art ? "Public health news" : "Medical art";
   $("#artToggle").setAttribute("aria-label", art ? "Back to public health news" : "Open medical art");
   $("#panelLabel").textContent = art ? "Gallery" : "Stories";
-  document.body.classList.toggle("show-looks", art);
+  document.body.classList.toggle("show-looks", false);
+  $("#srcBtn").hidden = !art; if (!art) setSources(false);
   $("#looksBtns").innerHTML = ART_PALS.map(l => `<button data-look="${l.k}" aria-pressed="${l.k===state.artPal}"><i style="background:linear-gradient(135deg,${l.sw[0]} 0 33%,${l.sw[1]} 33% 66%,${l.sw[2]} 66%)"></i>${l.n}</button>`).join("");
   setTimeout(() => { readColors(); if (state.world === "art" && ART.length){ renderWall(); renderKey(); renderAotd(); } }, 0);
 }
