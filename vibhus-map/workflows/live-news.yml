@@ -1,0 +1,76 @@
+# Vibhu's Map of Global Health: live news.
+# Checks the health news feeds every 15 minutes and publishes live.json to the "live-data" branch.
+# The map reads that file straight from GitHub, so new pins show up without redeploying the site.
+#
+# Three ways it runs:
+#   1. On a timer (every 15 minutes).
+#   2. By hand: Actions tab > "Live news for the map" > Run workflow. You can paste a link to pin,
+#      or a link to remove a bad pin.
+#   3. By webhook: POST to https://api.github.com/repos/vibhuguru/ideabank/dispatches with
+#      {"event_type":"news","client_payload":{"url":"https://..."}} and a GitHub token.
+
+name: Live news for the map
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Link to an article to pin now (optional)"
+        required: false
+      country:
+        description: "Two-letter country code if the robot might guess wrong, e.g. KE (optional)"
+        required: false
+      category:
+        description: "outbreak, environment, policy, humanitarian, wins, tech or research (optional)"
+        required: false
+      remove:
+        description: "Link of a pin to take off the map (optional)"
+        required: false
+  repository_dispatch:
+    types: [news]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: live-news
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: vibhus-map
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Get the current live pins
+        run: |
+          git fetch --depth=1 origin live-data 2>/dev/null && git show origin/live-data:live.json > prev.json || echo '{"stories":[]}' > prev.json
+
+      - name: Read the feeds
+        env:
+          ADD_URL: ${{ github.event.inputs.url }}
+          ADD_CC: ${{ github.event.inputs.country }}
+          ADD_CATEGORY: ${{ github.event.inputs.category }}
+          REMOVE_URL: ${{ github.event.inputs.remove }}
+          EVENT_PAYLOAD: ${{ toJSON(github.event.client_payload) }}
+        run: node vibhus-map/live/fetch-news.mjs prev.json out/live.json
+
+      - name: Publish to the live-data branch
+        run: |
+          cd out
+          git init -q -b live-data
+          git config user.name "vibhus-map-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          echo "Live pins for Vibhu's Map of Global Health. Rewritten automatically every 15 minutes." > README.md
+          git add live.json README.md
+          git commit -q -m "Live news $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -q --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" live-data
