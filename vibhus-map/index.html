@@ -159,7 +159,6 @@ a{color:inherit}
 .ib:hover{border-color:var(--outline)}
 .ib:active{background:var(--chip)}
 .ib svg{width:16px;height:16px}
-.rotpad{display:grid;grid-template-columns:repeat(3,34px);gap:4px}
 .ctrl-cap{font-family:var(--f-display);font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:center}
 .dragmode{display:flex;flex-direction:column;gap:4px;padding:6px}
 .dragmode .seg{box-shadow:none}
@@ -177,7 +176,16 @@ a{color:inherit}
 .tip img{width:15px;height:10px;border-radius:2px}
 
 /* ---------- story card ---------- */
-.card{position:absolute;right:16px;top:120px;width:350px;max-height:calc(100% - 120px - 16px - var(--keyh,0px) - 12px - var(--dock,0px));overflow-y:auto;z-index:5}
+.card{position:absolute;right:16px;top:120px;width:350px;max-width:calc(100% - 32px);max-height:calc(100% - 120px - 16px - var(--keyh,0px) - 12px - var(--dock,0px));overflow:hidden;z-index:5;display:flex;flex-direction:column}
+.card[hidden]{display:none}
+.card-scroll{position:relative;overflow-y:auto;min-height:0;flex:1 1 auto;border-radius:inherit}
+.card-grip{position:absolute;left:0;bottom:0;width:22px;height:22px;cursor:nesw-resize;touch-action:none;z-index:2;border-bottom-left-radius:inherit;
+  background:linear-gradient(45deg,transparent 30%,var(--muted) 30%,var(--muted) 38%,transparent 38%,transparent 52%,var(--muted) 52%,var(--muted) 60%,transparent 60%);opacity:.55}
+.card-grip:hover,.card-grip:focus-visible,.card.resizing .card-grip{opacity:1}
+.card-grip:focus-visible{outline:2px solid var(--outline);outline-offset:-2px}
+.card.resizing{user-select:none;-webkit-user-select:none}
+.country.world .wicon{width:30px;height:30px;color:var(--muted);flex:none}
+.item .m .wicon{width:14px;height:14px;vertical-align:-2px;margin-right:4px;color:var(--muted)}
 .preview{display:grid;grid-template-columns:76px 1fr;gap:12px;align-items:center;padding:8px;border-radius:12px;background:var(--chip);border:1.5px solid var(--line);text-decoration:none;color:inherit;min-width:0}
 .preview:hover{border-color:var(--outline)}
 .pv-thumb{width:76px;height:76px;border-radius:8px;overflow:hidden;background:var(--panel);display:grid;place-items:center;border:1.5px solid var(--line);flex:none}
@@ -373,8 +381,10 @@ body.show-looks .panel{top:170px}
   .key-rows{display:grid;grid-template-columns:1fr 1fr;gap:2px}
   .krow{white-space:normal;font-size:12.5px;line-height:1.2}
   .ctrls{left:auto;right:16px;bottom:calc(16px + var(--dock,0px))}
-  .ctrl-group.rot,.dragmode{display:none}
+  .dragmode{display:none}
   .card{left:16px;right:16px;width:auto;top:auto;bottom:calc(16px + var(--dock,0px));max-height:60%}
+  .card-grip{left:50%;top:0;bottom:auto;width:56px;height:18px;transform:translateX(-50%);cursor:ns-resize;background:none;opacity:1}
+  .card-grip::before{content:"";position:absolute;left:14px;right:14px;top:6px;height:5px;border-radius:3px;background:var(--muted);opacity:.6}
   .gallery{left:16px;right:16px;width:auto;top:auto;height:70%}
   body.show-looks .looks{display:none}
   body.show-looks .panel{top:auto}
@@ -451,20 +461,6 @@ body.show-looks .panel{top:170px}
       <button class="ib" id="zoomIn" aria-label="Zoom in">+</button>
       <button class="ib" id="zoomOut" aria-label="Zoom out">−</button>
       <button class="ib" id="resetView" aria-label="Reset map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button>
-    </div>
-    <div class="ctrl-group rot box">
-      <div class="rotpad" id="rotpad">
-        <button class="ib" data-rot="0,0,-1" aria-label="Twist left">⟲</button>
-        <button class="ib" data-rot="0,-1,0" aria-label="Tilt up">↑</button>
-        <button class="ib" data-rot="0,0,1" aria-label="Twist right">⟳</button>
-        <button class="ib" data-rot="1,0,0" aria-label="Spin left">←</button>
-        <button class="ib" data-rot="level" aria-label="Level the map">◎</button>
-        <button class="ib" data-rot="-1,0,0" aria-label="Spin right">→</button>
-        <span></span>
-        <button class="ib" data-rot="0,1,0" aria-label="Tilt down">↓</button>
-        <span></span>
-      </div>
-      <span class="ctrl-cap">Rotate</span>
     </div>
     <div class="dragmode box" id="dragmode">
       <span class="ctrl-cap">Drag to</span>
@@ -755,14 +751,19 @@ function currentItems(){
   const y = posToYear(state.yearPos);
   return EVENTS.filter(e => state.cats.has(e.category) && e.year <= y).sort((a,b) => b.year - a.year);
 }
+const isWorld = it => it.lat == null || it.lon == null;
 function groupItems(items){
   const groups = [];
   for (const it of items){
+    if (isWorld(it)) continue;
     let g = groups.find(g => Math.abs(g.lat - it.lat) < 1.6 && Math.abs(((g.lon - it.lon + 540) % 360) - 180) < 1.6);
     if (!g){ g = { id:"g-" + it.id, lat:it.lat, lon:it.lon, items:[] }; groups.push(g); }
     g.items.push(it);
   }
   return groups;
+}
+function groupOf(it){
+  return groups.find(g => g.items.some(i => i.id === it.id)) || { id: "w-" + it.id, world: true, lat: null, lon: null, items: [it] };
 }
 const whenOf = it => state.world === "art" ? it.when : state.mode === "now" ? ago(it.age) : fmtYear(it.year);
 
@@ -875,21 +876,7 @@ $("#zoomOut").onclick = () => d3.select(stage).transition().duration(250).call(z
 function zoomCenter(){ const a = mapArea(); return [(a.x0+a.x1)/2, (a.y0+a.y1)/2]; }
 $("#resetView").onclick = () => { stopFly(); rotG = GLOBE_ROT0.slice(); rotF = FLAT_ROT0.slice(); globeK = 1; flatT = d3.zoomIdentity; syncZoom(); needsDraw = true; };
 
-// rotate pad: tap to nudge, hold to keep turning
-let rotVel = null;
-$("#rotpad").addEventListener("pointerdown", e => {
-  const b = e.target.closest("[data-rot]"); if (!b) return;
-  e.preventDefault(); stopFly();
-  if (b.dataset.rot === "level"){ rot()[1] = 0; rot()[2] = 0; needsDraw = true; return; }
-  const v = b.dataset.rot.split(",").map(Number);
-  nudge(v, 6); rotVel = { v, t0: performance.now() };
-  b.setPointerCapture(e.pointerId);
-});
-["pointerup","pointercancel","lostpointercapture"].forEach(t => $("#rotpad").addEventListener(t, () => rotVel = null));
-$("#rotpad").addEventListener("keydown", e => {
-  const b = e.target.closest("[data-rot]"); if (!b || (e.key !== "Enter" && e.key !== " ")) return;
-  e.preventDefault(); if (b.dataset.rot === "level"){ rot()[1] = 0; rot()[2] = 0; } else nudge(b.dataset.rot.split(",").map(Number), 15); needsDraw = true;
-});
+let rotVel = null;  // (rotate pad removed; drag the globe to spin it)
 function nudge(v, deg){
   const r = rot(); r[0] += v[0] * deg; r[1] = Math.max(-89, Math.min(89, r[1] + v[1] * deg)); r[2] = (r[2] + v[2] * deg) % 360; needsDraw = true;
 }
@@ -974,20 +961,21 @@ function renderFeed(items){
     $("#feed").innerHTML = `<li class="empty">${state.world === "news" && state.mode === "history" ? "Nothing on the map yet. Drag the timeline forward." : "Nothing matches. Try a longer time range or switch a category back on in the Key."}</li>`;
     return;
   }
-  $("#feed").innerHTML = items.map(s => `<li><button class="item${s.id===state.selectedId?" sel":""}" data-id="${s.id}">${pinMark(s.category)}<span><span class="t">${esc(s.title)}</span><span class="m">${flagImg(s.cc)}${esc(s.place)} · ${esc(whenOf(s))}${hearts.counts[s.id] ? ` · <span class="hc">♥ ${hearts.counts[s.id]}</span>` : ""}</span></span></button></li>`).join("");
+  $("#feed").innerHTML = items.map(s => `<li><button class="item${s.id===state.selectedId?" sel":""}" data-id="${s.id}">${pinMark(s.category)}<span><span class="t">${esc(s.title)}</span><span class="m">${isWorld(s) ? WORLD_ICON : flagImg(s.cc)}${esc(isWorld(s) ? "Worldwide" : s.place)} · ${esc(whenOf(s))}${hearts.counts[s.id] ? ` · <span class="hc">♥ ${hearts.counts[s.id]}</span>` : ""}</span></span></button></li>`).join("");
 }
 $("#feed").addEventListener("click", e => {
   const fl = e.target.closest(".flip");
   if (fl){ if (!e.target.closest("a")) fl.classList.toggle("flipped"); return; }
   const b = e.target.closest(".item"); if (!b) return;
-  const g = groups.find(g => g.items.some(i => i.id === b.dataset.id)); if (!g) return;
-  openGroup(g, b.dataset.id, true);
+  const it = currentItems().find(i => i.id === b.dataset.id); if (!it) return;
+  openGroup(groupOf(it), it.id, true);
   if (innerWidth <= 760) setPanel(false);
 });
 function highlightFeed(ids){ document.querySelectorAll("#feed .item").forEach(b => b.classList.toggle("hot", ids.includes(b.dataset.id))); }
 
 /* ---------- story card ---------- */
 const card = $("#card");
+const WORLD_ICON = `<svg class="wicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.6 3.8 5.6 3.8 9s-1.2 6.4-3.8 9c-2.6-2.6-3.8-5.6-3.8-9S9.4 5.6 12 3z"/></svg>`;
 const X_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
 function preview(s){
   const dom = domainOf(s.url);
@@ -1001,7 +989,7 @@ function preview(s){
 function openGroup(g, id, flyIt = false){
   state.selectedGroup = g; state.selectedId = id || g.items[0].id;
   renderCard(); renderPins(); highlightSel(); needsDraw = true;
-  if (flyIt || state.view === "globe") flyTo(g.lon, g.lat, flyIt ? 900 : 650);
+  if (!g.world && (flyIt || state.view === "globe")) flyTo(g.lon, g.lat, flyIt ? 900 : 650);
 }
 function highlightSel(){ document.querySelectorAll("#feed .item").forEach(b => b.classList.toggle("sel", b.dataset.id === state.selectedId)); }
 function renderCard(){
@@ -1012,10 +1000,10 @@ function renderCard(){
   const region = (isNow && s.region ? `<span class="tag">${esc(REGION_LABEL[s.region] || s.region)}</span>` : "") + (isNow && s.live ? `<span class="tag live-tag" title="Picked up automatically from ${esc(s.source)}'s news feed"><span class="livedot"></span>Live feed</span>` : "");
   const others = g.items.filter(i => i.id !== s.id);
   card.style.setProperty("--c", `var(--c-${s.category})`);
-  card.innerHTML = `<button class="close" id="cardClose" aria-label="Close">${X_ICON}</button>
+  card.innerHTML = `<div class="card-scroll"><button class="close" id="cardClose" aria-label="Close">${X_ICON}</button>
     <div class="card-body">
       <div class="card-meta"><span class="tag cat-tag">${CAT_LABEL[s.category]}</span>${region}</div>
-      <div class="country">${flagImg(s.cc, s.country + " flag")}<div><b>${esc(s.country || s.place)}</b><span>${esc(s.place)} · ${fmtCoord(s.lat, s.lon)}</span></div></div>
+      ${isWorld(s) ? `<div class="country world">${WORLD_ICON}<div><b>Worldwide</b><span>No single place, so no pin on the map</span></div></div>` : `<div class="country">${flagImg(s.cc, s.country + " flag")}<div><b>${esc(s.country || s.place)}</b><span>${esc(s.place)} · ${fmtCoord(s.lat, s.lon)}</span></div></div>`}
       <h3>${esc(s.title)}</h3>
       <span class="src">${esc(when)}</span>
       <p>${esc(s.summary)}</p>
@@ -1023,9 +1011,69 @@ function renderCard(){
       ${isNow ? heartButton(s) : ""}
     </div>
     ${others.length ? `<div class="stack"><span class="label">Also here</span>${others.map(o => `<button class="item" data-sid="${o.id}">${pinMark(o.category)}<span><span class="t">${esc(o.title)}</span><span class="m">${esc(whenOf(o))}</span></span></button>`).join("")}</div>` : ""}
-    <div class="card-nav"><button data-step="-1">← Previous</button><button data-step="1">Next →</button></div>`;
-  card.hidden = false; card.scrollTop = 0;
+    <div class="card-nav"><button data-step="-1">← Previous</button><button data-step="1">Next →</button></div></div>
+    <div class="card-grip" id="cardGrip" role="separator" aria-label="Resize story card. Drag, or use arrow keys. Double-click to reset." tabindex="0"></div>`;
+  card.hidden = false; card.querySelector(".card-scroll").scrollTop = 0;
+  applyCardSize();
 }
+/* Resize the story card by dragging its corner (bottom-left on desktop, top bar on phones). */
+const CARD_KEY = "vm-card-size";
+let cardSize = (() => { try { return JSON.parse(localStorage.getItem(CARD_KEY)) || null; } catch(e){ return null; } })();
+const phone = () => innerWidth <= 760;
+function applyCardSize(){
+  if (!cardSize){ card.style.width = ""; card.style.height = ""; return; }
+  const k = phone() ? "m" : "d", sz = cardSize[k] || {};
+  card.style.width = !phone() && sz.w ? sz.w + "px" : "";
+  card.style.height = "";
+  if (sz.h){ const [, h] = clampCard(sz.w || card.offsetWidth, sz.h); card.style.height = h + "px"; }
+  card.style.maxHeight = phone() && sz.h ? "90%" : "";
+}
+function saveCardSize(w, h){
+  const k = phone() ? "m" : "d"; cardSize = cardSize || {}; cardSize[k] = { w, h };
+  try { localStorage.setItem(CARD_KEY, JSON.stringify(cardSize)); } catch(e){}
+}
+function clampCard(w, h){
+  const r = $("#app").getBoundingClientRect();
+  const maxW = Math.max(300, r.width - (document.body.classList.contains("panel-open") ? 400 : 60));
+  const c = card.getBoundingClientRect();
+  const top = Math.max(r.top, ...[...document.querySelectorAll("header, .topbar, .tools")].map(el => el.getBoundingClientRect().bottom));
+  const maxH = phone() ? Math.min(r.height * 0.9, c.bottom - top - 10) : r.bottom - c.top - 16;
+  return [Math.round(Math.min(maxW, Math.max(280, w))), Math.round(Math.min(maxH, Math.max(180, h)))];
+}
+let gripDrag = null;
+card.addEventListener("pointerdown", e => {
+  if (!e.target.closest("#cardGrip")) return;
+  e.preventDefault(); e.stopPropagation();
+  const r = card.getBoundingClientRect();
+  gripDrag = { x: e.clientX, y: e.clientY, w: r.width, h: r.height, id: e.pointerId };
+  e.target.setPointerCapture(e.pointerId); card.classList.add("resizing");
+});
+card.addEventListener("pointermove", e => {
+  if (!gripDrag || e.pointerId !== gripDrag.id) return;
+  const dx = e.clientX - gripDrag.x, dy = e.clientY - gripDrag.y;
+  const [w, h] = clampCard(phone() ? gripDrag.w : gripDrag.w - dx, phone() ? gripDrag.h - dy : gripDrag.h + dy);
+  if (!phone()) card.style.width = w + "px"; else card.style.maxHeight = "90%";
+  card.style.height = h + "px";
+});
+["pointerup","pointercancel","lostpointercapture"].forEach(t => card.addEventListener(t, () => {
+  if (!gripDrag) return; gripDrag = null; card.classList.remove("resizing");
+  saveCardSize(parseFloat(card.style.width) || null, parseFloat(card.style.height) || null);
+}));
+card.addEventListener("dblclick", e => {
+  if (!e.target.closest("#cardGrip")) return;
+  const k = phone() ? "m" : "d"; if (cardSize) delete cardSize[k];
+  try { localStorage.setItem(CARD_KEY, JSON.stringify(cardSize || {})); } catch(err){}
+  applyCardSize();
+});
+card.addEventListener("keydown", e => {
+  if (!e.target.closest("#cardGrip")) return;
+  const step = e.shiftKey ? 60 : 20, r = card.getBoundingClientRect();
+  const d = { ArrowLeft:[step,0], ArrowRight:[-step,0], ArrowDown:[0,step], ArrowUp:[0,-step] }[e.key]; if (!d) return;
+  e.preventDefault();
+  const [w, h] = clampCard(r.width + (phone() ? 0 : d[0]), r.height + (phone() ? -d[1] : d[1]));
+  if (!phone()) card.style.width = w + "px"; card.style.height = h + "px"; saveCardSize(phone() ? null : w, h);
+});
+addEventListener("resize", () => { if (!card.hidden) applyCardSize(); });
 card.addEventListener("click", e => {
   e.stopPropagation();
   if (e.target.closest("#cardClose")) return closeCard();
@@ -1037,7 +1085,7 @@ card.addEventListener("click", e => {
     const items = currentItems(); if (!items.length) return;
     const i = items.findIndex(x => x.id === state.selectedId);
     const next = items[(i + +st.dataset.step + items.length) % items.length];
-    openGroup(groups.find(g => g.items.includes(next)), next.id, true);
+    openGroup(groupOf(next), next.id, true);
   }
 });
 const HEART = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.4 8 3.4 4.5 7 4.5c2 0 3.6 1.2 5 3 1.4-1.8 3-3 5-3 3.6 0 5.6 3.5 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2z" stroke-linejoin="round"/></svg>`;
@@ -1233,14 +1281,14 @@ function setView(v){
   state.view = v; $("#viewGlobe").setAttribute("aria-pressed", v==="globe"); $("#viewFlat").setAttribute("aria-pressed", v==="flat");
   $("#dragmode").hidden = v === "globe";
   stopFly(); resize(); syncZoom();
-  if (state.selectedGroup) flyTo(state.selectedGroup.lon, state.selectedGroup.lat, 600);
+  if (state.selectedGroup && !state.selectedGroup.world) flyTo(state.selectedGroup.lon, state.selectedGroup.lat, 600);
 }
 $("#viewGlobe").onclick = () => setView("globe");
 $("#viewFlat").onclick = () => setView("flat");
 $("#surprise").onclick = () => {
   const items = currentItems(); if (!items.length) return;
   let pick; do { pick = items[Math.floor(Math.random() * items.length)]; } while (items.length > 1 && pick.id === state.selectedId);
-  openGroup(groups.find(g => g.items.includes(pick)), pick.id, true);
+  openGroup(groupOf(pick), pick.id, true);
 };
 function setPanel(open){
   state.panelOpen = open;

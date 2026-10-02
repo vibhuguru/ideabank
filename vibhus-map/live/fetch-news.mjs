@@ -91,7 +91,7 @@ function parseFeed(xml){
 }
 
 /* ---------- where did it happen? ---------- */
-const TERMS = GEO.terms.map(([t, cc, place]) => ({ cc, place, re: new RegExp(`(?<![\\p{L}\\p{N}])${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}])`, 'gu') }));
+const TERMS = GEO.terms.map(([t, cc, place, lat, lon]) => ({ cc, place, lat, lon, re: new RegExp(`(?<![\\p{L}\\p{N}])${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}])`, 'gu') }));
 function locate(title, text){
   const score = {}, first = {}, place = {};
   [[title, 3], [text, 1]].forEach(([s, w], part) => {
@@ -102,7 +102,7 @@ function locate(title, text){
         if (term.cc){
           score[term.cc] = (score[term.cc] || 0) + w;
           const k = part * 1e6 + pos; if (first[term.cc] === undefined || k < first[term.cc]) first[term.cc] = k;
-          if (term.place && !place[term.cc]) place[term.cc] = term.place;
+          if (term.place && !place[term.cc]) place[term.cc] = term;
         }
         return ' '.repeat(m.length);
       });
@@ -111,13 +111,14 @@ function locate(title, text){
   const ranked = Object.keys(score).sort((a, b) => score[b] - score[a] || first[a] - first[b]);
   if (!ranked.length) return null;
   const cc = ranked[0], c = GEO.countries[cc];
-  return { cc, country: c.name, place: place[cc] || c.name, lat: c.lat, lon: c.lon, region: c.region };
+  const p = place[cc], hasXY = p && p.lat != null;
+  return { cc, country: c.name, place: p ? p.place : c.name, lat: hasXY ? p.lat : c.lat, lon: hasXY ? p.lon : c.lon, region: c.region };
 }
 
 /* ---------- what kind of story is it? ---------- */
 const CATS = {
   wins: [/\beliminat(ed|es|ion)\b/i, /\bcertified\b.*\bfree\b/i, /\bfree of\b/i, /\beradicat/i, /\bmilestone\b/i, /\brecord low\b/i, /\bsaved\b.*\blives\b/i, /\bsuccess(ful)?\b/i, /\bbreakthrough\b/i, /\bcelebrat/i, /\bfalls? to\b/i, /\bdeclin(e|ed|ing)\b/i, /\bfirst[- ]ever\b/i],
-  outbreak: [/\boutbreaks?\b/i, /\b(new|confirmed|suspected|rising|reported) cases\b|\bcases (rise|rose|climb|surge)/i, /\bebola\b/i, /\bcholera\b/i, /\bmeasles\b/i, /\bmpox\b/i, /\bH5N1\b/i, /\bbird flu\b|\bavian\b/i, /\bdengue\b/i, /\bpolio\b/i, /\bmarburg\b/i, /\bnipah\b/i, /\bplague\b/i, /\bepidemic\b/i, /\bpandemic\b/i, /\bvirus\b/i, /\binfections?\b/i, /\bdiphtheria\b/i, /\bchikungunya\b/i, /\bmalaria\b/i, /\btuberculosis\b|\bTB\b/, /\bzika\b/i, /\blassa\b/i, /\bwhooping cough\b|\bpertussis\b/i, /\blisteria\b|\bsalmonella\b|\bE\. coli\b/i, /\bCOVID\b/i, /\binfluenza\b|\bflu\b/i, /\bexposures?\b/i],
+  outbreak: [/\boutbreaks?\b/i, /\b(new|confirmed|suspected|rising|reported) cases\b|\bcases (rise|rose|climb|surge)/i, /\bebola\b/i, /\bcholera\b/i, /\bmeasles\b/i, /\bmpox\b/i, /\bH5N1\b/i, /\bbird flu\b|\bavian\b/i, /\bdengue\b/i, /\bpolio\b/i, /\bmarburg\b/i, /\bnipah\b/i, /\bplague\b/i, /\bepidemic\b/i, /\bpandemic\b/i, /\bvirus\b/i, /\binfections?\b/i, /\bdiphtheria\b/i, /\bchikungunya\b/i, /\bmalaria\b/i, /\btuberculosis\b|\bTB\b/, /\bzika\b/i, /\bhaemorrhagic\b|\bhemorrhagic\b|\bfever\b/i, /\blassa\b/i, /\bwhooping cough\b|\bpertussis\b/i, /\blisteria\b|\bsalmonella\b|\bE\. coli\b/i, /\bCOVID\b/i, /\binfluenza\b|\bflu\b/i, /\bexposures?\b/i],
   humanitarian: [/\bhumanitarian\b/i, /\brefugees?\b/i, /\bdisplaced\b/i, /\bfamine\b/i, /\bhunger\b/i, /\bmalnutrition\b|\bmalnourished\b/i, /\bwar\b/i, /\bconflict\b/i, /\bairstrikes?\b|\bbombing\b|\battacks? on\b/i, /\bsiege\b/i, /\bceasefire\b/i, /\baid\b/i, /\bcrisis\b/i, /\bevacuat/i, /\bshelling\b/i],
   environment: [/\bclimate\b/i, /\bheat(wave| wave|stroke)?\b/i, /\bair pollution\b|\bair quality\b|\bsmog\b/i, /\bfloods?\b|\bflooding\b/i, /\bdrought\b/i, /\bwildfires?\b|\bsmoke\b/i, /\bpollution\b/i, /\blead\b.*\b(poison|water|pipes)\b/i, /\bmicroplastics?\b/i, /\bPFAS\b|\bchemicals?\b/i, /\bhurricane\b|\bcyclone\b|\btyphoon\b|\bstorm\b/i, /\bemissions\b/i, /\btemperatures?\b/i],
   tech: [/\bAI\b/, /\bartificial intelligence\b/i, /\bapps?\b/i, /\bdigital\b/i, /\btelehealth\b|\btelemedicine\b/i, /\bdevices?\b/i, /\bwearables?\b/i, /\bstart-?ups?\b|\bbiotechs?\b|\bhealth tech\b|\bmedtech\b/i, /\braises \$|\bfunding round\b|\bvaluation\b|\bSeries [A-D]\b/i, /\balgorithm\b/i, /\brobot/i, /\bchatbot\b|\bLLM\b/i, /\bdrones?\b/i, /\bgene therapy\b|\bCRISPR\b|\bmRNA\b/i, /\bsoftware\b|\bplatform\b/i],
@@ -166,15 +167,18 @@ async function pageInfo(url){
   };
 }
 
-function build(raw, feed){
+// Tech stories with no country or city still go in the story list, just without a pin.
+const WORLD = { cc: null, country: 'Worldwide', place: 'No single place', lat: null, lon: null, region: null };
+function build(raw, feed, allowWorld = false){
+  const cat = CATS[raw.category] ? raw.category : categorize(raw.title, raw.summary, feed.category);
   const where = raw.cc && GEO.countries[raw.cc.toUpperCase()]
     ? (c => ({ cc: raw.cc.toUpperCase(), country: c.name, place: c.name, lat: c.lat, lon: c.lon, region: c.region }))(GEO.countries[raw.cc.toUpperCase()])
     : locate(raw.title, raw.summary + ' ' + (raw.text || ''));
-  if (!where) return null;
-  const cat = CATS[raw.category] ? raw.category : categorize(raw.title, raw.summary, feed.category);
-  return { id: idFor(raw.url), date: raw.date, category: cat, region: where.region, title: raw.title, summary: raw.summary || '',
-    place: where.place, lat: where.lat, lon: where.lon, cc: where.cc, country: where.country, source: raw.source || feed.name,
-    url: normUrl(raw.url), image: raw.image || null, live: true };
+  if (!where && !(allowWorld && cat === 'tech')) return null;
+  const w = where || WORLD;
+  return { id: idFor(raw.url), date: raw.date, category: cat, region: w.region, title: raw.title, summary: raw.summary || '',
+    place: w.place, lat: w.lat, lon: w.lon, cc: w.cc, country: w.country, source: raw.source || feed.name,
+    url: normUrl(raw.url), image: raw.image || null, live: true, ...(where ? {} : { world: true }) };
 }
 
 /* ---------- journals (Europe PMC, free, no key) ---------- */
@@ -225,6 +229,7 @@ async function main(){
     if (!s.pinned && !s.journal){ const f = FEEDS.find(x => x.name === s.source); s.category = categorize(s.title, s.summary || '', f && f.category); }
     byUrl.set(s.url, s);
   }
+  const tried = new Set(prev.tried || []);
   const known = u => byUrl.has(normUrl(u)) || curated.has(normUrl(u)) || removed.has(normUrl(u));
   const titles = new Set([...byUrl.values()].map(s => s.title.toLowerCase()));
   const log = [];
@@ -256,17 +261,20 @@ async function main(){
     const { f, items } = r.value; let n = 0;
     for (const it of items){
       if (daysAgo(it.date) > MAX_AGE_DAYS || known(it.url) || titles.has(it.title.toLowerCase()) || /^STAT\+:/.test(it.title)) continue;
-      const s = build(it, f); if (!s){ if (f.category === 'research' || f.category === 'tech') unplaced.push({ it, f }); continue; }
+      const s = build(it, f); if (!s){ const c = categorize(it.title, it.summary, f.category); if ((c === 'tech' || c === 'research' || f.category === 'tech' || f.category === 'research') && !tried.has(normUrl(it.url))) unplaced.push({ it, f }); continue; }
       byUrl.set(s.url, s); titles.add(s.title.toLowerCase()); fresh.push(s); n++;
     }
     log.push(`${f.name}: ${items.length} read, ${n} new pins`);
   }
 
   // 2b. research and tech stories that never named a country: read the article itself
+  //     (country or city). Tech stories that still have no place join the list as worldwide stories, with no pin.
   await Promise.allSettled(unplaced.slice(0, PLACE_LOOKUPS).map(async ({ it, f }) => {
-    const p = await pageInfo(it.url);
-    const s = build({ ...it, text: p.text + ' ' + (p.summary || ''), image: it.image || p.image }, f);
-    if (s && !byUrl.has(s.url)){ byUrl.set(s.url, s); titles.add(s.title.toLowerCase()); fresh.push(s); log.push(`placed from article text: ${s.title} -> ${s.country}`); }
+    tried.add(normUrl(it.url));
+    let p = { text: '', summary: '', image: null };
+    try { p = await pageInfo(it.url); } catch {}
+    const s = build({ ...it, text: p.text + ' ' + (p.summary || ''), image: it.image || p.image }, f, true);
+    if (s && !byUrl.has(s.url)){ byUrl.set(s.url, s); titles.add(s.title.toLowerCase()); fresh.push(s); log.push(s.world ? `worldwide (no pin): ${s.title}` : `placed from article text: ${s.title} -> ${s.place}`); }
   }));
 
   // 2c. free public health journals via Europe PMC (where the study happened, or where the authors work)
@@ -291,7 +299,7 @@ async function main(){
     if (s.journal) return ++journalCount <= MAX_JOURNAL;
     return (perSource[s.source] = (perSource[s.source] || 0) + 1) <= MAX_PER_SOURCE;
   }).slice(0, MAX_ITEMS);
-  const out = { updated: new Date().toISOString(), feedsOk: okFeeds, feedsTotal: FEEDS.length, stories, removed: [...removed].slice(-300) };
+  const out = { updated: new Date().toISOString(), feedsOk: okFeeds, feedsTotal: FEEDS.length, stories, removed: [...removed].slice(-300), tried: [...tried].slice(-600) };
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, JSON.stringify(out, null, 1));
   console.log(log.join('\n'));
