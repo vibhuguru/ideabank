@@ -20,7 +20,12 @@ const CURATED = path.join(DIR, '..', 'data', 'stories.json');
 const MAX_AGE_DAYS = 21;      // live pins drop off after three weeks
 const MAX_ITEMS = 150;        // cap on live pins
 const PER_FEED = 25;          // newest items read from each feed per run
-const IMAGE_LOOKUPS = 40;     // article pages opened per run to find a preview image
+const IMAGE_LOOKUPS = 40;
+const PLACE_LOOKUPS = 20;     // research/tech articles opened to find where they happened
+const MAX_PER_SOURCE = 20;    // so one busy outlet can't flood the map
+const MAX_JOURNAL = 45;       // journal papers kept on the map at once
+const JOURNAL_DAYS = 10;      // how far back to look for new papers
+const JOURNALS = (() => { try { return JSON.parse(fs.readFileSync(path.join(DIR, 'journals.json'), 'utf8')).journals || []; } catch { return []; } })();     // article pages opened per run to find a preview image
 const UA = 'Mozilla/5.0 (compatible; VibhusMapBot/1.0; +https://vibhuguru.github.io/ideabank/vibhus-map/)';
 
 const today = new Date();
@@ -112,10 +117,10 @@ function locate(title, text){
 /* ---------- what kind of story is it? ---------- */
 const CATS = {
   wins: [/\beliminat(ed|es|ion)\b/i, /\bcertified\b.*\bfree\b/i, /\bfree of\b/i, /\beradicat/i, /\bmilestone\b/i, /\brecord low\b/i, /\bsaved\b.*\blives\b/i, /\bsuccess(ful)?\b/i, /\bbreakthrough\b/i, /\bcelebrat/i, /\bfalls? to\b/i, /\bdeclin(e|ed|ing)\b/i, /\bfirst[- ]ever\b/i],
-  outbreak: [/\boutbreaks?\b/i, /\bcases?\b/i, /\bebola\b/i, /\bcholera\b/i, /\bmeasles\b/i, /\bmpox\b/i, /\bH5N1\b/i, /\bbird flu\b|\bavian\b/i, /\bdengue\b/i, /\bpolio\b/i, /\bmarburg\b/i, /\bnipah\b/i, /\bplague\b/i, /\bepidemic\b/i, /\bpandemic\b/i, /\bvirus\b/i, /\binfections?\b/i, /\bdiphtheria\b/i, /\bchikungunya\b/i, /\bmalaria\b/i, /\btuberculosis\b|\bTB\b/, /\bzika\b/i, /\blassa\b/i, /\bwhooping cough\b|\bpertussis\b/i, /\blisteria\b|\bsalmonella\b|\bE\. coli\b/i, /\bCOVID\b/i, /\binfluenza\b|\bflu\b/i, /\bexposures?\b/i, /\bspread(s|ing)?\b/i],
+  outbreak: [/\boutbreaks?\b/i, /\b(new|confirmed|suspected|rising|reported) cases\b|\bcases (rise|rose|climb|surge)/i, /\bebola\b/i, /\bcholera\b/i, /\bmeasles\b/i, /\bmpox\b/i, /\bH5N1\b/i, /\bbird flu\b|\bavian\b/i, /\bdengue\b/i, /\bpolio\b/i, /\bmarburg\b/i, /\bnipah\b/i, /\bplague\b/i, /\bepidemic\b/i, /\bpandemic\b/i, /\bvirus\b/i, /\binfections?\b/i, /\bdiphtheria\b/i, /\bchikungunya\b/i, /\bmalaria\b/i, /\btuberculosis\b|\bTB\b/, /\bzika\b/i, /\blassa\b/i, /\bwhooping cough\b|\bpertussis\b/i, /\blisteria\b|\bsalmonella\b|\bE\. coli\b/i, /\bCOVID\b/i, /\binfluenza\b|\bflu\b/i, /\bexposures?\b/i],
   humanitarian: [/\bhumanitarian\b/i, /\brefugees?\b/i, /\bdisplaced\b/i, /\bfamine\b/i, /\bhunger\b/i, /\bmalnutrition\b|\bmalnourished\b/i, /\bwar\b/i, /\bconflict\b/i, /\bairstrikes?\b|\bbombing\b|\battacks? on\b/i, /\bsiege\b/i, /\bceasefire\b/i, /\baid\b/i, /\bcrisis\b/i, /\bevacuat/i, /\bshelling\b/i],
   environment: [/\bclimate\b/i, /\bheat(wave| wave|stroke)?\b/i, /\bair pollution\b|\bair quality\b|\bsmog\b/i, /\bfloods?\b|\bflooding\b/i, /\bdrought\b/i, /\bwildfires?\b|\bsmoke\b/i, /\bpollution\b/i, /\blead\b.*\b(poison|water|pipes)\b/i, /\bmicroplastics?\b/i, /\bPFAS\b|\bchemicals?\b/i, /\bhurricane\b|\bcyclone\b|\btyphoon\b|\bstorm\b/i, /\bemissions\b/i, /\btemperatures?\b/i],
-  tech: [/\bAI\b/, /\bartificial intelligence\b/i, /\bapps?\b/i, /\bdigital\b/i, /\btelehealth\b|\btelemedicine\b/i, /\bdevices?\b/i, /\bwearables?\b/i, /\bstartup\b/i, /\braises \$|\bfunding round\b|\bvaluation\b|\bSeries [A-D]\b/i, /\balgorithm\b/i, /\brobot/i, /\bchatbot\b|\bLLM\b/i, /\bdrones?\b/i, /\bgene therapy\b|\bCRISPR\b|\bmRNA\b/i, /\bsoftware\b|\bplatform\b/i],
+  tech: [/\bAI\b/, /\bartificial intelligence\b/i, /\bapps?\b/i, /\bdigital\b/i, /\btelehealth\b|\btelemedicine\b/i, /\bdevices?\b/i, /\bwearables?\b/i, /\bstart-?ups?\b|\bbiotechs?\b|\bhealth tech\b|\bmedtech\b/i, /\braises \$|\bfunding round\b|\bvaluation\b|\bSeries [A-D]\b/i, /\balgorithm\b/i, /\brobot/i, /\bchatbot\b|\bLLM\b/i, /\bdrones?\b/i, /\bgene therapy\b|\bCRISPR\b|\bmRNA\b/i, /\bsoftware\b|\bplatform\b/i],
   research: [/\bstudy\b|\bstudies\b/i, /\btrial\b/i, /\bresearchers?\b/i, /\bscientists?\b/i, /\bfinds?\b|\bfound\b/i, /\breview\b/i, /\bjournal\b/i, /\bLancet\b|\bNEJM\b|\bJAMA\b|\bBMJ\b|\bNature\b/, /\bdata show\b|\banalysis\b/i, /\blinked to\b|\btied to\b|\bassociated with\b/i, /\bmay (help|reduce|raise|lower|increase)\b/i],
   policy: [/\bpolicy\b|\bpolicies\b/i, /\blaw\b|\bbill\b|\blegislat/i, /\bban(s|ned)?\b/i, /\btax\b/i, /\bregulat/i, /\bfunding\b|\bbudget\b|\bcuts?\b/i, /\bminist(er|ry)\b/i, /\bgovernment\b/i, /\bWHO\b|\bWorld Health Assembly\b/, /\bguidelines?\b/i, /\bapprov(e|es|ed|al)\b/i, /\bcourt\b|\blawsuit\b/i, /\bHHS\b|\bFDA\b|\bCDC\b/, /\bdeal\b|\bagreement\b|\btreaty\b/i, /\bprices?\b|\bpricing\b/i, /\binsurance\b|\bMedicare\b|\bMedicaid\b/i, /\bvaccine (rules|schedule|policy|mandate)/i],
 };
@@ -125,9 +130,9 @@ function categorize(title, text, fallback){
   if (CLEAR_WIN.test(title)) return 'wins';
   const sc = {};
   for (const [cat, res] of Object.entries(CATS)) sc[cat] = res.reduce((n, re) => n + (re.test(title) ? 3 : 0) + (re.test(text) ? 1 : 0), 0);
-  if (fallback && sc[fallback] !== undefined) sc[fallback] += 1.5;
+  if (fallback && sc[fallback] !== undefined) sc[fallback] += fallback === 'policy' ? 0.5 : 1.5;
   const best = ORDER.slice().sort((a, b) => sc[b] - sc[a] || ORDER.indexOf(a) - ORDER.indexOf(b))[0];
-  return sc[best] > 1.5 ? best : (fallback || 'policy');
+  return sc[best] >= 2 ? best : (fallback || 'policy');
 }
 
 /* ---------- network ---------- */
@@ -172,6 +177,35 @@ function build(raw, feed){
     url: normUrl(raw.url), image: raw.image || null, live: true };
 }
 
+/* ---------- journals (Europe PMC, free, no key) ---------- */
+async function fetchJournals(){
+  const from = iso(new Date(today - JOURNAL_DAYS * 864e5)), to = iso(today);
+  const byName = Object.fromEntries(JOURNALS.map(j => [j.name.toLowerCase(), j]));
+  const q = `(${JOURNALS.map(j => `JOURNAL:"${j.name}"`).join(' OR ')}) AND FIRST_PDATE:[${from} TO ${to}] AND SRC:MED`;
+  const url = (process.env.EUROPEPMC_URL || 'https://www.ebi.ac.uk/europepmc/webservices/rest/search') + '?format=json&resultType=core&pageSize=200&query=' + encodeURIComponent(q);
+  const data = JSON.parse(await get(url, 25000));
+  const out = [];
+  for (const r of data?.resultList?.result || []){
+    const jt = r.journalInfo?.journal || {};
+    const j = byName[(jt.isoabbreviation || '').toLowerCase()] || byName[(jt.medlineAbbreviation || '').toLowerCase()]
+      || JOURNALS.find(x => [jt.title, jt.medlineAbbreviation, jt.isoabbreviation].some(t => t && t.toLowerCase().replace(/\./g, '') === x.name.toLowerCase()));
+    const title = clean(r.title || '').replace(/\.$/, '');
+    if (!title || /^(correction|erratum|retraction|corrigendum)\b/i.test(title) || /^(Correction|Erratum|Retraction)/i.test(r.pubTypeList?.pubType?.[0] || '')) continue;
+    const abstract = clean(r.abstractText || '').replace(/^(background|introduction|summary)\s*:?\s*/i, '');
+    const affs = [r.affiliation, ...((r.authorList?.author) || []).flatMap(a => [a.affiliation, ...((a.authorAffiliationDetailsList?.authorAffiliation) || []).map(x => x.affiliation)])].filter(Boolean);
+    let where = locate(title, abstract), how = 'study';
+    if (!where) for (const a of affs){ where = locate(a, ''); if (where){ how = 'authors'; break; } }
+    if (!where) continue;
+    const link = r.doi ? `https://doi.org/${r.doi}` : `https://europepmc.org/article/${r.source || 'MED'}/${r.id}`;
+    const cat = (j?.category === 'tech' || /\b(AI|machine learning|deep learning|large language model|digital|smartphone|app|wearable|telemedicine|telehealth)\b/i.test(title)) ? 'tech' : 'research';
+    out.push({ id: idFor(link), date: r.firstPublicationDate || to, category: cat, region: where.region, title,
+      summary: shorten(abstract || `${r.authorString || ''}`.trim()), place: how === 'authors' ? `${where.country} (where the authors work)` : where.place,
+      lat: where.lat, lon: where.lon, cc: where.cc, country: where.country, source: j?.label || jt.title || 'Journal',
+      url: normUrl(link), image: null, live: true, journal: true });
+  }
+  return out.sort((a, b) => b.date.localeCompare(a.date));
+}
+
 /* ---------- main ---------- */
 async function main(){
   let prev = { stories: [], removed: [] };
@@ -186,7 +220,11 @@ async function main(){
   if (removeUrl) removed.add(normUrl(removeUrl));
 
   const byUrl = new Map();
-  for (const s of prev.stories) if (!removed.has(s.url) && daysAgo(s.date) <= MAX_AGE_DAYS) byUrl.set(s.url, s);
+  for (const s of prev.stories){
+    if (removed.has(s.url) || daysAgo(s.date) > MAX_AGE_DAYS || /^STAT\+:/.test(s.title)) continue;
+    if (!s.pinned && !s.journal){ const f = FEEDS.find(x => x.name === s.source); s.category = categorize(s.title, s.summary || '', f && f.category); }
+    byUrl.set(s.url, s);
+  }
   const known = u => byUrl.has(normUrl(u)) || curated.has(normUrl(u)) || removed.has(normUrl(u));
   const titles = new Set([...byUrl.values()].map(s => s.title.toLowerCase()));
   const log = [];
@@ -211,17 +249,34 @@ async function main(){
   // 2. the RSS feeds
   let okFeeds = 0;
   const results = await Promise.allSettled(FEEDS.map(async f => { try { return { f, items: parseFeed(await get(f.url)).slice(0, PER_FEED) }; } catch (e) { throw new Error(`${f.name}: ${e.message}`); } }));
-  const fresh = [];
+  const fresh = [], unplaced = [];
   for (const r of results){
     if (r.status !== 'fulfilled'){ log.push(`feed failed: ${r.reason?.message || r.reason}`); continue; }
     okFeeds++;
     const { f, items } = r.value; let n = 0;
     for (const it of items){
-      if (daysAgo(it.date) > MAX_AGE_DAYS || known(it.url) || titles.has(it.title.toLowerCase())) continue;
-      const s = build(it, f); if (!s) continue;
+      if (daysAgo(it.date) > MAX_AGE_DAYS || known(it.url) || titles.has(it.title.toLowerCase()) || /^STAT\+:/.test(it.title)) continue;
+      const s = build(it, f); if (!s){ if (f.category === 'research' || f.category === 'tech') unplaced.push({ it, f }); continue; }
       byUrl.set(s.url, s); titles.add(s.title.toLowerCase()); fresh.push(s); n++;
     }
     log.push(`${f.name}: ${items.length} read, ${n} new pins`);
+  }
+
+  // 2b. research and tech stories that never named a country: read the article itself
+  await Promise.allSettled(unplaced.slice(0, PLACE_LOOKUPS).map(async ({ it, f }) => {
+    const p = await pageInfo(it.url);
+    const s = build({ ...it, text: p.text + ' ' + (p.summary || ''), image: it.image || p.image }, f);
+    if (s && !byUrl.has(s.url)){ byUrl.set(s.url, s); titles.add(s.title.toLowerCase()); fresh.push(s); log.push(`placed from article text: ${s.title} -> ${s.country}`); }
+  }));
+
+  // 2c. free public health journals via Europe PMC (where the study happened, or where the authors work)
+  if (JOURNALS.length){
+    try {
+      const papers = await fetchJournals();
+      let n = 0;
+      for (const s of papers){ if (known(s.url) || titles.has(s.title.toLowerCase())) continue; byUrl.set(s.url, s); titles.add(s.title.toLowerCase()); n++; }
+      log.push(`Journals (Europe PMC): ${papers.length} papers placed, ${n} new pins`);
+    } catch (e) { log.push(`Journals (Europe PMC) failed: ${e.message}`); }
   }
 
   // 3. preview images for new stories that came without one
@@ -230,7 +285,12 @@ async function main(){
     looked++; const p = await pageInfo(s.url); if (p.image) s.image = p.image; if (!s.summary && p.summary) s.summary = p.summary;
   }));
 
-  const stories = [...byUrl.values()].sort((a, b) => b.date.localeCompare(a.date) || a.title.localeCompare(b.title)).slice(0, MAX_ITEMS);
+  const perSource = {}; let journalCount = 0;
+  const stories = [...byUrl.values()].sort((a, b) => b.date.localeCompare(a.date) || a.title.localeCompare(b.title)).filter(s => {
+    if (s.pinned) return true;
+    if (s.journal) return ++journalCount <= MAX_JOURNAL;
+    return (perSource[s.source] = (perSource[s.source] || 0) + 1) <= MAX_PER_SOURCE;
+  }).slice(0, MAX_ITEMS);
   const out = { updated: new Date().toISOString(), feedsOk: okFeeds, feedsTotal: FEEDS.length, stories, removed: [...removed].slice(-300) };
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, JSON.stringify(out, null, 1));

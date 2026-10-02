@@ -1,0 +1,25 @@
+{
+  "note": "Free public health journals, read through Europe PMC (https://europepmc.org). Names are the short journal titles Europe PMC uses. category is research or tech.",
+  "journals": [
+    {"name": "Lancet Glob Health", "label": "The Lancet Global Health", "category": "research"},
+    {"name": "BMJ Glob Health", "label": "BMJ Global Health", "category": "research"},
+    {"name": "PLOS Glob Public Health", "label": "PLOS Global Public Health", "category": "research"},
+    {"name": "PLoS Med", "label": "PLOS Medicine", "category": "research"},
+    {"name": "PLoS Negl Trop Dis", "label": "PLOS Neglected Tropical Diseases", "category": "research"},
+    {"name": "Emerg Infect Dis", "label": "Emerging Infectious Diseases (CDC)", "category": "research"},
+    {"name": "Euro Surveill", "label": "Eurosurveillance", "category": "research"},
+    {"name": "Bull World Health Organ", "label": "Bulletin of the WHO", "category": "research"},
+    {"name": "MMWR Morb Mortal Wkly Rep", "label": "MMWR (CDC)", "category": "research"},
+    {"name": "Lancet Planet Health", "label": "The Lancet Planetary Health", "category": "research"},
+    {"name": "EClinicalMedicine", "label": "eClinicalMedicine", "category": "research"},
+    {"name": "Glob Health Sci Pract", "label": "Global Health: Science and Practice", "category": "research"},
+    {"name": "J Glob Health", "label": "Journal of Global Health", "category": "research"},
+    {"name": "Lancet Reg Health Southeast Asia", "label": "The Lancet Regional Health: Southeast Asia", "category": "research"},
+    {"name": "Lancet Reg Health Am", "label": "The Lancet Regional Health: Americas", "category": "research"},
+    {"name": "Lancet Reg Health West Pac", "label": "The Lancet Regional Health: Western Pacific", "category": "research"},
+    {"name": "Lancet Reg Health Eur", "label": "The Lancet Regional Health: Europe", "category": "research"},
+    {"name": "Lancet Digit Health", "label": "The Lancet Digital Health", "category": "tech"},
+    {"name": "NPJ Digit Med", "label": "npj Digital Medicine", "category": "tech"},
+    {"name": "JMIR Public Health Surveill", "label": "JMIR Public Health and Surveillance", "category": "tech"}
+  ]
+}
