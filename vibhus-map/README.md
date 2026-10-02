@@ -9,6 +9,7 @@ A goofy world map of public health news, history and medical art. Let's learn!
 - `data/history.json` – History mode events
 - `data/art.json` – Medical art gallery
 - `data/flags.json` – country flags
+- To add a journal later, add a line to journals.json. To add a news feed, add a line to feeds.json.
 
 ## Turn on GitHub Pages
 Settings → Pages → Source: "Deploy from a branch" → Branch: `main`, folder `/ (root)` → Save.
